@@ -11,6 +11,7 @@ use actix_web::{
   App,
   HttpServer,
 };
+use actix_web_lab::middleware::from_fn;
 use rust_jwt_actix::jwt_middleware; // This is the JWT lib import, just follow the code.
 
 pub fn build_auth_routes() -> Scope {
@@ -26,7 +27,6 @@ pub fn build_user_routes() -> Scope {
   //   .route("/echo", web::get().to(echo))
 }
 
-use actix_web_lab::middleware::from_fn;
 HttpServer::new(move || {
   let auth_scope = build_auth_routes();
   let user_scope = build_user_routes();
