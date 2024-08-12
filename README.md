@@ -45,6 +45,8 @@ This implements a function that will run on protected routes "user_scope".
 
 You can use this bit of code for generating new tokens to be validated internally and setting them on response via cookies:
 ```
+  use rust_jwt_actix::AUTH_STATE;
+
   let n_tokens = AUTH_STATE.write()
     .expect("Unable to write to AUTH_STATE")
     .renew_tokens_by_id(&user.username.clone().expect("Could not find username on /signup"));
