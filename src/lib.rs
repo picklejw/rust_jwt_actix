@@ -3,9 +3,10 @@ use actix_web::{
   body::MessageBody,
   dev::{ServiceRequest, ServiceResponse},
   error::{ErrorInternalServerError, ErrorUnauthorized},
+  middleware::Next,
   Error,
 };
-use actix_web_lab::middleware::Next;
+// use actix_web_lab::middleware::Next;
 
 use base64::prelude::*;
 use lazy_static::lazy_static;
@@ -137,9 +138,7 @@ impl AuthState {
               })
             }
           } else {
-            Err(
-              "Refresh token does not match, cannot generate new tokens... don't know why this would happen".to_string()
-            )
+            Err("Refresh token does not match, cannot generate new tokens... don't know why this would happen".to_string())
           }
         } else {
           // access_token found and is good
