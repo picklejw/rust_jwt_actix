@@ -1,18 +1,18 @@
+use actix_web::cookie::CookieBuilder;
 use actix_web::{
   body::MessageBody,
-  dev::{ ServiceRequest, ServiceResponse },
+  dev::{ServiceRequest, ServiceResponse},
+  error::{ErrorInternalServerError, ErrorUnauthorized},
   Error,
-  error::{ ErrorUnauthorized, ErrorInternalServerError },
 };
 use actix_web_lab::middleware::Next;
-use actix_web::cookie::CookieBuilder;
 
-use std::time::{ SystemTime, UNIX_EPOCH };
-use uuid::Uuid;
 use base64::prelude::*;
 use lazy_static::lazy_static;
-use std::collections::{ HashSet, HashMap };
-use std::sync::{ RwLock, Arc };
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, RwLock};
+use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Uuid;
 
 #[derive(Eq, Hash, PartialEq)]
 pub enum TokenType {
@@ -71,13 +71,13 @@ impl AuthState {
     }
 
     encode_b64(
-      id.to_owned() +
-        "~" +
-        &(&current_time + add_time).to_string() +
-        "~" +
-        type_id.to_string().as_str() +
-        "~" +
-        &Uuid::new_v4().to_string()
+      id.to_owned()
+        + "~"
+        + &(&current_time + add_time).to_string()
+        + "~"
+        + type_id.to_string().as_str()
+        + "~"
+        + &Uuid::new_v4().to_string(),
     )
   }
 
@@ -85,9 +85,18 @@ impl AuthState {
     let decoded = decode_b64(token_str).expect("Could not decode token to readable string");
     let parts: Vec<_> = decoded.split("~").collect();
     ParsedCookie {
-      uid: parts.get(0).expect("Could not get uid for parse_cookie").to_string(),
-      exp_date: parts.get(1).expect("Could not get exp_date for parse_cookie").to_string(),
-      uuid: parts.get(2).expect("Could not get uuid for parse_cookie").to_string(),
+      uid: parts
+        .get(0)
+        .expect("Could not get uid for parse_cookie")
+        .to_string(),
+      exp_date: parts
+        .get(1)
+        .expect("Could not get exp_date for parse_cookie")
+        .to_string(),
+      uuid: parts
+        .get(2)
+        .expect("Could not get uuid for parse_cookie")
+        .to_string(),
     }
   }
 
@@ -111,9 +120,11 @@ impl AuthState {
 
         if current_time > a_parsed.exp_date {
           // access_token expired
-          if
-            &req_r_token ==
-            uid_dat.refresh_token.as_ref().expect("saved tokens did not have refresh_token")
+          if &req_r_token
+            == uid_dat
+              .refresh_token
+              .as_ref()
+              .expect("saved tokens did not have refresh_token")
           {
             let r_parsed = AuthState::parse_token(req_r_token);
             if current_time > r_parsed.exp_date {
@@ -154,10 +165,11 @@ impl AuthState {
 
     if let Some(uid_dat) = self.valid_tokens.get_mut(uid) {
       self.stale_access_tokens.insert(
-        uid_dat.access_token
+        uid_dat
+          .access_token
           .clone()
           .expect("Could not add expiring access_token to stale_access_tokens")
-          .to_string()
+          .to_string(),
       );
       *uid_dat = n_tokens.clone();
     } else {
@@ -179,7 +191,9 @@ impl AuthState {
 }
 
 pub fn decode_b64(b64_string: &str) -> Option<String> {
-  let decoded = BASE64_STANDARD.decode(b64_string).expect("Decoding for auth failed");
+  let decoded = BASE64_STANDARD
+    .decode(b64_string)
+    .expect("Decoding for auth failed");
   Some(String::from_utf8(decoded).expect("Could not conver b64 decode to string"))
 }
 
@@ -193,9 +207,10 @@ lazy_static! {
 
 pub async fn jwt_middleware<T>(
   req: ServiceRequest,
-  next: Next<T>
+  next: Next<T>,
 ) -> Result<ServiceResponse<T>, Error>
-  where T: MessageBody
+where
+  T: MessageBody,
 {
   match AUTH_STATE.write() {
     Ok(mut mut_auth_state) => {
@@ -206,36 +221,40 @@ pub async fn jwt_middleware<T>(
           if cookies.access_token != None {
             let at_cookie = CookieBuilder::new(
               "access_token",
-              cookies.access_token.expect("Could not set access token to cookie")
+              cookies
+                .access_token
+                .expect("Could not set access token to cookie"),
             )
-              .path("/")
-              .http_only(true)
-              .finish();
+            .path("/")
+            // .http_only(true)
+            .finish();
             let rt_cookie = CookieBuilder::new(
               "refresh_token",
-              cookies.refresh_token.expect("Could not set refresh token to cookie")
+              cookies
+                .refresh_token
+                .expect("Could not set refresh token to cookie"),
             )
-              .path("/")
-              .http_only(true)
-              .finish();
+            .path("/")
+            // .http_only(true)
+            .finish();
             let res_mut = res.response_mut();
-            res_mut.add_cookie(&at_cookie).expect("Could not add cookie: at");
-            res_mut.add_cookie(&rt_cookie).expect("Could not add cookie: rt");
+            res_mut
+              .add_cookie(&at_cookie)
+              .expect("Could not add cookie: at");
+            res_mut
+              .add_cookie(&rt_cookie)
+              .expect("Could not add cookie: rt");
           }
 
           Ok(res)
         }
-        Err(err_msg) => {
-          Err(ErrorUnauthorized(format!("Invalid token: {}", err_msg).to_string()))?
-        } // Handle poisoned lock
+        Err(err_msg) => Err(ErrorUnauthorized(
+          format!("Invalid token: {}", err_msg).to_string(),
+        ))?, // Handle poisoned lock
       }
     }
-    Err(lock_err) => {
-      Err(
-        ErrorInternalServerError(
-          format!("Internal Error Occured, PANIC NOW!: {}", "err_msg").to_string()
-        )
-      )?
-    }
+    Err(lock_err) => Err(ErrorInternalServerError(
+      format!("Internal Error Occured, PANIC NOW!: {}", "err_msg").to_string(),
+    ))?,
   }
 }
